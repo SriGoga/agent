@@ -1,0 +1,76 @@
+{
+  "name": "demo",
+  "description": "Self-contained walkthrough of the orchestration engine: parallel branches, a retrying node, and a human-approval release gate.",
+  "nodes": [
+    {
+      "id": "collect-input",
+      "stage": "requirements",
+      "description": "Collect the demo's starting input.",
+      "depends_on": [],
+      "action": "demo_collect_input",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "flaky-build",
+      "stage": "implementation",
+      "description": "A build step that fails once, then succeeds on retry.",
+      "depends_on": ["collect-input"],
+      "action": "demo_flaky_build",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "parallel-a",
+      "stage": "implementation",
+      "description": "Independent task A, runs concurrently with flaky-build and parallel-b.",
+      "depends_on": ["collect-input"],
+      "action": "demo_noop",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "parallel-b",
+      "stage": "implementation",
+      "description": "Independent task B, runs concurrently with flaky-build and parallel-a.",
+      "depends_on": ["collect-input"],
+      "action": "demo_noop",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "join-tests",
+      "stage": "testing",
+      "description": "Join point: only eligible once all three implementation nodes have passed.",
+      "depends_on": ["flaky-build", "parallel-a", "parallel-b"],
+      "action": "demo_noop",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "approval-gate",
+      "stage": "release",
+      "description": "High-impact release step; halts the run for human approval.",
+      "depends_on": ["join-tests"],
+      "action": "demo_noop",
+      "requires_approval": true,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "release",
+      "stage": "release",
+      "description": "Runs only after approval-gate is approved.",
+      "depends_on": ["approval-gate"],
+      "action": "demo_noop",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    }
+  ]
+}
