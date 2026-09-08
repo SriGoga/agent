@@ -40,9 +40,14 @@ key + `owner_id` returns the original link instead of creating a duplicate (N3).
 
 ## `GET /links/{code}/analytics?owner_id=...` -- analytics (F3)
 
-Returns `click_count`, `first_click_at`, `last_click_at`, and a `referrers` breakdown (raw
-events aggregated on read, per assumption A3). 404 if the code doesn't exist, isn't owned by
-`owner_id`, or was deleted.
+Returns `click_count`, `unique_visitors` and `unique_visitors_last_24h` (distinct hashed
+client IPs, all-time and in the last 24h -- added Phase 5, see
+`docs/brownfield-analysis.md`), `first_click_at`, `last_click_at`, and a `referrers`
+breakdown (raw events aggregated on read, per assumption A3). 404 if the code doesn't exist,
+isn't owned by `owner_id`, or was deleted.
+
+Visitor identity is a salted SHA-256 hash of the client IP, truncated to 16 hex chars -- the
+raw IP is never persisted (see `src/url_shortener/privacy.py`).
 
 ## `GET /links?owner_id=...` -- list (F4)
 

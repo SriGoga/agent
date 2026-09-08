@@ -36,3 +36,5 @@ class AnalyticsResponse(BaseModel):
     first_click_at: float | None
     last_click_at: float | None
     referrers: dict[str, int]
+    unique_visitors: int
+    unique_visitors_last_24h: int
