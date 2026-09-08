@@ -1,0 +1,116 @@
+{
+  "name": "greenfield-url-shortener",
+  "description": "Build the URL Shortener service from the normalized requirements in docs/requirements.md.",
+  "nodes": [
+    {
+      "id": "req-review",
+      "stage": "requirements",
+      "description": "Confirm docs/requirements.md is the basis for this run.",
+      "depends_on": [],
+      "action": "reuse_requirements_doc",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "design-schema",
+      "stage": "design",
+      "description": "Design the SQLite schema for links and click events.",
+      "depends_on": ["req-review"],
+      "action": "design_data_schema",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 1 },
+      "rollback_action": null
+    },
+    {
+      "id": "design-api-contract",
+      "stage": "design",
+      "description": "Design the REST contract for F1-F5 (create/redirect/analytics/list/delete).",
+      "depends_on": ["req-review"],
+      "action": "design_api_contract",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 1 },
+      "rollback_action": null
+    },
+    {
+      "id": "implement-storage",
+      "stage": "implementation",
+      "description": "Implement the SQLite-backed repository layer.",
+      "depends_on": ["design-schema"],
+      "action": "implement_storage_layer",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 1 },
+      "rollback_action": "revert_storage_layer"
+    },
+    {
+      "id": "implement-create-api",
+      "stage": "implementation",
+      "description": "Implement POST /links (F1, F6, N1-N3).",
+      "depends_on": ["design-api-contract", "implement-storage"],
+      "action": "implement_create_endpoint",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 1 },
+      "rollback_action": "revert_create_endpoint"
+    },
+    {
+      "id": "implement-redirect-api",
+      "stage": "implementation",
+      "description": "Implement GET /{code} (F2).",
+      "depends_on": ["implement-storage"],
+      "action": "implement_redirect_endpoint",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 1 },
+      "rollback_action": "revert_redirect_endpoint"
+    },
+    {
+      "id": "implement-analytics-api",
+      "stage": "implementation",
+      "description": "Implement GET /links/{code}/analytics (F3).",
+      "depends_on": ["implement-storage"],
+      "action": "implement_analytics_endpoint",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 1 },
+      "rollback_action": "revert_analytics_endpoint"
+    },
+    {
+      "id": "unit-tests",
+      "stage": "testing",
+      "description": "Unit tests for storage, ID generation, validation.",
+      "depends_on": ["implement-create-api", "implement-redirect-api", "implement-analytics-api"],
+      "action": "run_unit_tests",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 2 },
+      "rollback_action": null
+    },
+    {
+      "id": "integration-tests",
+      "stage": "testing",
+      "description": "End-to-end API tests: create -> redirect -> analytics -> list -> delete.",
+      "depends_on": ["unit-tests"],
+      "action": "run_integration_tests",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 2 },
+      "rollback_action": null
+    },
+    {
+      "id": "write-docs",
+      "stage": "documentation",
+      "description": "Write API/setup docs for the shortener service.",
+      "depends_on": ["implement-create-api", "implement-redirect-api", "implement-analytics-api"],
+      "action": "write_service_docs",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "release-gate",
+      "stage": "release",
+      "description": "Release readiness check: tests + docs complete, policy guardrails pass.",
+      "depends_on": ["integration-tests", "write-docs"],
+      "action": "release_readiness_check",
+      "requires_approval": true,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": "rollback_release"
+    }
+  ]
+}
