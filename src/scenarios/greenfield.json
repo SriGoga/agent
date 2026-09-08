@@ -18,7 +18,7 @@
       "description": "Design the SQLite schema for links and click events.",
       "depends_on": ["req-review"],
       "action": "design_data_schema",
-      "requires_approval": false,
+      "requires_approval": true,
       "retry": { "max_attempts": 2, "backoff_seconds": 1 },
       "rollback_action": null
     },

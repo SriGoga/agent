@@ -35,3 +35,17 @@ pytest
 
 See `docs/setup.md` (added in a later phase) for full run instructions once the API and
 orchestrator CLI exist.
+
+## Phase log
+
+Each phase is one branch -> one PR -> one merge to `main` (see the repo's Closed PRs for the
+full diffs). This table is updated as part of every phase's own commit.
+
+| Phase | PR | What landed |
+|---|---|---|
+| 0 - Project setup | [#1](https://github.com/SriGoga/agent/pull/1) | Python toolchain (`pyproject.toml`), `src/orchestrator`, `src/url_shortener`, `src/scenarios` package skeletons, pytest wired up |
+| 1 - Requirement understanding | [#2](https://github.com/SriGoga/agent/pull/2) | `docs/requirements.md`: normalized F1-F6/N1-N4 spec + 6 identified ambiguities with the assumption chosen for each |
+| 2 - Task decomposition | [#3](https://github.com/SriGoga/agent/pull/3) | `src/scenarios/greenfield.json` (the 11-node DAG) + `docs/decomposition.md` (node schema, mermaid diagram, parallel/sequential/join call-outs) |
+| 3 - Orchestration engine | [#4](https://github.com/SriGoga/agent/pull/4) | `src/orchestrator/`: DAG execution engine (parallel+join, bounded retry, rollback + skip propagation, human-approval pause/resume/reject, policy guardrails, safe-stop, re-planning, lineage log, metrics), CLI, 12 tests |
+| 4 - URL Shortener (greenfield) | [#5](https://github.com/SriGoga/agent/pull/5) | `src/url_shortener/`: FastAPI service (create/redirect/analytics/list/delete), SQLite storage, collision-safe codes, rate limiting, idempotency; `src/scenarios/greenfield_steps.py` wires the Phase 2 graph to the real codebase so it can be executed by the orchestrator; `docs/api.md`; 22 new tests |
+
