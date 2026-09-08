@@ -29,7 +29,7 @@ instead of the plan drifting from what actually runs.
 
 ```mermaid
 graph TD
-    A[req-review] --> B[design-schema]
+    A[req-review] --> B{design-schema<br/>human approval}
     A --> C[design-api-contract]
     B --> D[implement-storage]
     C --> E[implement-create-api]
@@ -62,6 +62,10 @@ storage can't be built before the schema exists.
 - `release-gate` is a second join: it depends on both the testing branch and the docs branch,
   and additionally requires human approval — a high-impact action (this is what ships) is
   gated even though every upstream node already passed.
+- `design-schema` also requires human approval — not because the graph author asked for it,
+  but because the engine's `require_approval_on_schema_changes` policy (Phase 3) forces it on
+  any node touching the schema, regardless of how the graph JSON is written. Omitting
+  `requires_approval` there is a policy violation, not a valid configuration.
 
 **Bounded retry**: implementation and testing nodes retry up to 2 times with backoff before
 being marked failed and triggering `rollback_action`. `release-gate` has no retry — a failed
