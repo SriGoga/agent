@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse
 
 from url_shortener.codegen import CollisionExhaustedError, generate_unique_code
 from url_shortener.models import AnalyticsResponse, LinkCreateRequest, LinkResponse
+from url_shortener.privacy import hash_ip
 from url_shortener.ratelimit import RateLimiter
 from url_shortener.storage import Link, LinkRepository
 
@@ -106,5 +107,8 @@ def redirect(code: str, request: Request, repo: LinkRepository = Depends(get_rep
         raise HTTPException(status_code=404, detail="not found")
     if link.expires_at is not None and link.expires_at < time.time():
         raise HTTPException(status_code=410, detail="expired")
-    repo.record_click(code, request.headers.get("referer"), request.headers.get("user-agent"))
+    client_ip = request.client.host if request.client else None
+    repo.record_click(
+        code, request.headers.get("referer"), request.headers.get("user-agent"), hash_ip(client_ip)
+    )
     return RedirectResponse(url=link.target_url, status_code=307)

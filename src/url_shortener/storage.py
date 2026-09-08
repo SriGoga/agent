@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS clicks (
     ts REAL NOT NULL,
     referrer TEXT,
     user_agent TEXT,
+    ip_hash TEXT,
     FOREIGN KEY (code) REFERENCES links(code)
 );
 CREATE INDEX IF NOT EXISTS idx_clicks_code ON clicks(code);
@@ -75,6 +76,17 @@ class LinkRepository:
     def _init_schema(self) -> None:
         with self._session() as conn:
             conn.executescript(SCHEMA)
+            self._migrate_add_ip_hash_column(conn)
+
+    @staticmethod
+    def _migrate_add_ip_hash_column(conn: sqlite3.Connection) -> None:
+        """Brownfield migration (Phase 5): a database created before unique-visitor
+        analytics existed has a `clicks` table with no `ip_hash` column -- CREATE TABLE IF
+        NOT EXISTS above does nothing for an already-existing table. Add it in place,
+        idempotently, preserving existing rows (ip_hash is simply NULL for old clicks)."""
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(clicks)").fetchall()}
+        if "ip_hash" not in columns:
+            conn.execute("ALTER TABLE clicks ADD COLUMN ip_hash TEXT")
 
     @staticmethod
     def _row_to_link(row: sqlite3.Row) -> Link:
@@ -123,25 +135,36 @@ class LinkRepository:
             )
         return cur.rowcount > 0
 
-    def record_click(self, code: str, referrer: str | None, user_agent: str | None) -> None:
+    def record_click(
+        self, code: str, referrer: str | None, user_agent: str | None, ip_hash: str | None = None
+    ) -> None:
         with self._session() as conn:
             conn.execute(
-                "INSERT INTO clicks (code, ts, referrer, user_agent) VALUES (?, ?, ?, ?)",
-                (code, time.time(), referrer, user_agent),
+                "INSERT INTO clicks (code, ts, referrer, user_agent, ip_hash) VALUES (?, ?, ?, ?, ?)",
+                (code, time.time(), referrer, user_agent, ip_hash),
             )
 
     def analytics(self, code: str) -> dict:
         with self._session() as conn:
-            rows = conn.execute("SELECT ts, referrer FROM clicks WHERE code = ? ORDER BY ts", (code,)).fetchall()
+            rows = conn.execute(
+                "SELECT ts, referrer, ip_hash FROM clicks WHERE code = ? ORDER BY ts", (code,)
+            ).fetchall()
         referrers: dict[str, int] = {}
         for r in rows:
             key = r["referrer"] or "unknown"
             referrers[key] = referrers.get(key, 0) + 1
+
+        unique_visitors = len({r["ip_hash"] for r in rows if r["ip_hash"]})
+        cutoff = time.time() - 86400
+        unique_visitors_last_24h = len({r["ip_hash"] for r in rows if r["ip_hash"] and r["ts"] >= cutoff})
+
         return {
             "click_count": len(rows),
             "first_click_at": rows[0]["ts"] if rows else None,
             "last_click_at": rows[-1]["ts"] if rows else None,
             "referrers": referrers,
+            "unique_visitors": unique_visitors,
+            "unique_visitors_last_24h": unique_visitors_last_24h,
         }
 
     def find_idempotent_code(self, key: str, owner_id: str) -> str | None:

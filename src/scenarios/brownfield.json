@@ -1,0 +1,86 @@
+{
+  "name": "brownfield-expiry-cleanup",
+  "description": "Add unique-visitor analytics on top of the existing greenfield URL Shortener, including a safe migration for pre-existing databases. See docs/brownfield-analysis.md.",
+  "nodes": [
+    {
+      "id": "review-impacted-modules",
+      "stage": "requirements",
+      "description": "Codebase reasoning: confirm docs/brownfield-analysis.md identifies impacted modules/APIs/data flows.",
+      "depends_on": [],
+      "action": "review_impacted_modules",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "design-schema-change",
+      "stage": "design",
+      "description": "Design the clicks.ip_hash column and its migration path for existing databases.",
+      "depends_on": ["review-impacted-modules"],
+      "action": "design_schema_change",
+      "requires_approval": true,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "implement-storage-migration",
+      "stage": "implementation",
+      "description": "Verify the migration adds ip_hash to a pre-existing database without losing data.",
+      "depends_on": ["design-schema-change"],
+      "action": "implement_storage_migration",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 1 },
+      "rollback_action": "revert_storage_migration"
+    },
+    {
+      "id": "implement-analytics-update",
+      "stage": "implementation",
+      "description": "Verify analytics() reports unique_visitors correctly.",
+      "depends_on": ["implement-storage-migration"],
+      "action": "implement_analytics_update",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 1 },
+      "rollback_action": "revert_analytics_update"
+    },
+    {
+      "id": "implement-redirect-update",
+      "stage": "implementation",
+      "description": "Verify the redirect handler hashes the client IP before recording a click.",
+      "depends_on": ["implement-storage-migration"],
+      "action": "implement_redirect_update",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 1 },
+      "rollback_action": "revert_redirect_update"
+    },
+    {
+      "id": "regression-tests",
+      "stage": "testing",
+      "description": "Run the brownfield + privacy + existing shortener test suites.",
+      "depends_on": ["implement-analytics-update", "implement-redirect-update"],
+      "action": "run_regression_tests",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 2 },
+      "rollback_action": null
+    },
+    {
+      "id": "write-docs-update",
+      "stage": "documentation",
+      "description": "Confirm docs/api.md documents the new unique_visitors field.",
+      "depends_on": ["implement-analytics-update"],
+      "action": "write_docs_update",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "release-gate",
+      "stage": "release",
+      "description": "Release readiness for the brownfield change.",
+      "depends_on": ["regression-tests", "write-docs-update"],
+      "action": "release_readiness_check",
+      "requires_approval": true,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": "rollback_release"
+    }
+  ]
+}
