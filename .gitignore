@@ -3,5 +3,16 @@ dist/
 *.db
 *.db-journal
 .env
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+.coverage
+htmlcov/
+
+# orchestrator run artifacts
 .orchestrator/runs/*.jsonl
-coverage/
