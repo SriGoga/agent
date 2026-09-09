@@ -37,6 +37,15 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
 """
 
 
+class CodeAlreadyExistsError(Exception):
+    """Raised when an INSERT collides on the links.code primary key -- i.e. the code was
+    taken by a concurrent request between the caller's existence check and this insert."""
+
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(f"code already exists: {code}")
+
+
 @dataclass
 class Link:
     code: str
@@ -105,13 +114,19 @@ class LinkRepository:
             return row is not None
 
     def create_link(self, code: str, target_url: str, owner_id: str, expires_at: float | None = None) -> Link:
+        """Raises CodeAlreadyExistsError instead of a raw sqlite3.IntegrityError if `code`
+        was inserted by someone else between the caller's code_exists() check and this
+        insert -- see docs/risks.md, "TOCTOU race on code creation"."""
         now = time.time()
-        with self._session() as conn:
-            conn.execute(
-                "INSERT INTO links (code, target_url, owner_id, created_at, expires_at, deleted_at) "
-                "VALUES (?, ?, ?, ?, ?, NULL)",
-                (code, target_url, owner_id, now, expires_at),
-            )
+        try:
+            with self._session() as conn:
+                conn.execute(
+                    "INSERT INTO links (code, target_url, owner_id, created_at, expires_at, deleted_at) "
+                    "VALUES (?, ?, ?, ?, ?, NULL)",
+                    (code, target_url, owner_id, now, expires_at),
+                )
+        except sqlite3.IntegrityError as exc:
+            raise CodeAlreadyExistsError(code) from exc
         return Link(code, target_url, owner_id, now, expires_at, None)
 
     def get_link(self, code: str) -> Link | None:

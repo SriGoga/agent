@@ -12,7 +12,7 @@ from url_shortener.codegen import CollisionExhaustedError, generate_unique_code
 from url_shortener.models import AnalyticsResponse, LinkCreateRequest, LinkResponse, TopLinkEntry
 from url_shortener.privacy import hash_ip
 from url_shortener.ratelimit import RateLimiter
-from url_shortener.storage import Link, LinkRepository
+from url_shortener.storage import CodeAlreadyExistsError, Link, LinkRepository
 
 DB_PATH = os.environ.get("URL_SHORTENER_DB_PATH", "url_shortener.db")
 
@@ -72,7 +72,16 @@ def create_link(
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     expires_at = time.time() + payload.ttl_seconds if payload.ttl_seconds else None
-    link = repo.create_link(code, str(payload.target_url), payload.owner_id, expires_at)
+    try:
+        link = repo.create_link(code, str(payload.target_url), payload.owner_id, expires_at)
+    except CodeAlreadyExistsError:
+        # A concurrent request won the race between our code_exists() check and this
+        # insert (see docs/risks.md). A custom alias racing is a real conflict; a randomly
+        # generated code racing is astronomically unlikely but handled the same way rather
+        # than silently 500ing.
+        if payload.custom_alias:
+            raise HTTPException(status_code=409, detail="alias already taken") from None
+        raise HTTPException(status_code=503, detail="transient code collision, please retry") from None
 
     if idempotency_key:
         repo.save_idempotency_key(idempotency_key, payload.owner_id, code)

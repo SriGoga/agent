@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from url_shortener.main import app, get_rate_limiter, get_repo
 from url_shortener.ratelimit import RateLimiter
-from url_shortener.storage import LinkRepository
+from url_shortener.storage import CodeAlreadyExistsError, LinkRepository
 
 
 @pytest.fixture
@@ -50,6 +50,35 @@ def test_create_link_custom_alias_conflict_returns_409(client):
     client.post("/links", json={"target_url": "https://example.com/b", "owner_id": "alice", "custom_alias": "dup"})
     resp = client.post("/links", json={"target_url": "https://example.com/c", "owner_id": "bob", "custom_alias": "dup"})
     assert resp.status_code == 409
+
+
+# -- race conditions: docs/risks.md, "TOCTOU race on code creation" -----------
+def test_storage_raises_code_already_exists_on_duplicate_insert(repo):
+    repo.create_link("racecode", "https://example.com/first", "alice")
+    with pytest.raises(CodeAlreadyExistsError):
+        repo.create_link("racecode", "https://example.com/second", "bob")
+
+
+def test_create_link_race_on_custom_alias_returns_409(client, repo, monkeypatch):
+    """Simulates a concurrent request winning the race between code_exists() and the
+    insert: the pre-check says the alias is free, but by the time we insert, it's taken."""
+    repo.create_link("raced-alias", "https://example.com/winner", "bob")
+    monkeypatch.setattr(repo, "code_exists", lambda code: False)  # pretend the pre-check missed it
+    resp = client.post(
+        "/links",
+        json={"target_url": "https://example.com/loser", "owner_id": "alice", "custom_alias": "raced-alias"},
+    )
+    assert resp.status_code == 409
+
+
+def test_create_link_race_on_generated_code_returns_503(client, repo, monkeypatch):
+    """Same race, but for a randomly generated (non-alias) code: astronomically unlikely in
+    practice, but must fail cleanly (503) rather than as an unhandled 500."""
+    repo.create_link("collidingcode", "https://example.com/winner", "bob")
+    monkeypatch.setattr(repo, "code_exists", lambda code: False)
+    monkeypatch.setattr("url_shortener.main.generate_unique_code", lambda exists_fn: "collidingcode")
+    resp = client.post("/links", json={"target_url": "https://example.com/loser", "owner_id": "alice"})
+    assert resp.status_code == 503
 
 
 # -- N1: input validation ---------------------------------------------------
