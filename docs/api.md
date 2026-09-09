@@ -53,6 +53,16 @@ raw IP is never persisted (see `src/url_shortener/privacy.py`).
 
 Returns the caller's non-deleted links, newest first.
 
+## `GET /links/top?owner_id=...&metric=clicks|unique_visitors&window=all|24h&limit=10`
+
+Ranks the caller's own links by popularity (added Phase 6; see `docs/ambiguous-analysis.md`
+for the ambiguities this resolved). **Always scoped to `owner_id` -- there is no global
+leaderboard across all users' links**, since there's no auth system to gate that (assumption
+A1) and it would leak other owners' target URLs and click volumes. This is enforced by both
+the route (`owner_id` is required) and, independently, the orchestrator's
+`no_cross_owner_data_exposure` policy guardrail. `limit` is capped at 50. `metric` defaults
+to `clicks`; `window` defaults to `all` (use `24h` for the last 24 hours).
+
 ## `DELETE /links/{code}?owner_id=...` -- delete (F5)
 
 Soft-deletes (sets `deleted_at`); 204 on success, 404 if not found or not owned by the

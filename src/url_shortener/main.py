@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import os
 import time
+from typing import Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
 
 from url_shortener.codegen import CollisionExhaustedError, generate_unique_code
-from url_shortener.models import AnalyticsResponse, LinkCreateRequest, LinkResponse
+from url_shortener.models import AnalyticsResponse, LinkCreateRequest, LinkResponse, TopLinkEntry
 from url_shortener.privacy import hash_ip
 from url_shortener.ratelimit import RateLimiter
 from url_shortener.storage import Link, LinkRepository
@@ -82,6 +83,20 @@ def create_link(
 @app.get("/links", response_model=list[LinkResponse])
 def list_links(owner_id: str, repo: LinkRepository = Depends(get_repo)) -> list[LinkResponse]:
     return [_to_response(link) for link in repo.list_links(owner_id)]
+
+
+@app.get("/links/top", response_model=list[TopLinkEntry])
+def top_links(
+    owner_id: str,
+    metric: Literal["clicks", "unique_visitors"] = "clicks",
+    window: Literal["all", "24h"] = "all",
+    limit: int = Query(default=10, ge=1, le=50),
+    repo: LinkRepository = Depends(get_repo),
+) -> list[TopLinkEntry]:
+    """Ambiguity B5 (docs/ambiguous-analysis.md): always scoped to owner_id, never global --
+    also enforced independently by the no_cross_owner_data_exposure orchestrator policy."""
+    window_hours = 24.0 if window == "24h" else None
+    return [TopLinkEntry(**row) for row in repo.top_links(owner_id, metric, window_hours, limit)]
 
 
 @app.get("/links/{code}/analytics", response_model=AnalyticsResponse)
