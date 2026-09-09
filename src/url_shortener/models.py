@@ -30,6 +30,12 @@ class LinkResponse(BaseModel):
     expires_at: float | None
 
 
+class TopLinkEntry(BaseModel):
+    code: str
+    target_url: str
+    metric_value: int
+
+
 class AnalyticsResponse(BaseModel):
     code: str
     click_count: int

@@ -170,6 +170,36 @@ def test_policy_blocks_unapproved_schema_change(tmp_path):
     assert "require_approval_on_schema_changes" in rt.error
 
 
+def test_policy_blocks_cross_owner_data_exposure(tmp_path):
+    async def mixed_owner_output(ctx: StepContext) -> dict:
+        return {"items": [{"owner_id": "alice", "code": "a1"}, {"owner_id": "bob", "code": "b1"}]}
+
+    graph = make_graph([node("top-links", action="mixed_owner_output")])
+    registry = ActionRegistry()
+    registry.register_action("mixed_owner_output", mixed_owner_output)
+    orch = Orchestrator(graph, registry, new_store(tmp_path), entry_policies=[])  # default exit policies active
+    status = asyncio.run(orch.run())
+
+    assert status == RunStatus.FAILED
+    rt = orch.node_states["top-links"]
+    assert rt.state == NodeState.FAILED
+    assert "no_cross_owner_data_exposure" in rt.error
+
+
+def test_policy_allows_single_owner_data(tmp_path):
+    async def single_owner_output(ctx: StepContext) -> dict:
+        return {"items": [{"owner_id": "alice", "code": "a1"}, {"owner_id": "alice", "code": "a2"}]}
+
+    graph = make_graph([node("top-links", action="single_owner_output")])
+    registry = ActionRegistry()
+    registry.register_action("single_owner_output", single_owner_output)
+    orch = Orchestrator(graph, registry, new_store(tmp_path), entry_policies=[])
+    status = asyncio.run(orch.run())
+
+    assert status == RunStatus.COMPLETED
+    assert orch.node_states["top-links"].state == NodeState.PASSED
+
+
 def test_safe_stop_halts_before_next_batch(tmp_path):
     async def always_fails(ctx: StepContext) -> dict:
         raise RuntimeError("boom")

@@ -167,6 +167,34 @@ class LinkRepository:
             "unique_visitors_last_24h": unique_visitors_last_24h,
         }
 
+    def top_links(self, owner_id: str, metric: str, window_hours: float | None, limit: int) -> list[dict]:
+        """Ranks the caller's own links by clicks or distinct visitors (ambiguity B1/B2,
+        docs/ambiguous-analysis.md). Always scoped to owner_id -- see ambiguity B5."""
+        time_filter = ""
+        query_params: list = []
+        if window_hours is not None:
+            time_filter = "AND c.ts >= ?"
+            query_params.append(time.time() - window_hours * 3600)
+
+        metric_expr = "COUNT(DISTINCT c.ip_hash)" if metric == "unique_visitors" else "COUNT(c.id)"
+        query_params.append(owner_id)
+        query_params.append(limit)
+
+        query = f"""
+            SELECT l.code, l.target_url, {metric_expr} AS metric_value
+            FROM links l
+            LEFT JOIN clicks c ON c.code = l.code {time_filter}
+            WHERE l.owner_id = ? AND l.deleted_at IS NULL
+            GROUP BY l.code
+            ORDER BY metric_value DESC, l.created_at DESC
+            LIMIT ?
+        """
+        with self._session() as conn:
+            rows = conn.execute(query, query_params).fetchall()
+        return [
+            {"code": r["code"], "target_url": r["target_url"], "metric_value": r["metric_value"]} for r in rows
+        ]
+
     def find_idempotent_code(self, key: str, owner_id: str) -> str | None:
         with self._session() as conn:
             row = conn.execute(

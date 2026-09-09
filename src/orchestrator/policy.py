@@ -64,6 +64,24 @@ _SECRET_PATTERNS = [
 ]
 
 
+def no_cross_owner_data_exposure(ctx: PolicyContext) -> None:
+    """Change control / privacy: blocks a node's output if it bundles items belonging to
+    more than one distinct owner_id -- e.g. an aggregate/leaderboard-style endpoint that
+    should be scoped to a single caller but was implemented (or later modified) to mix
+    owners together. See docs/ambiguous-analysis.md (ambiguity B5)."""
+    if not ctx.output:
+        return
+    items = ctx.output.get("items")
+    if not isinstance(items, list):
+        return
+    owner_ids = {item.get("owner_id") for item in items if isinstance(item, dict) and "owner_id" in item}
+    if len(owner_ids) > 1:
+        raise PolicyViolation(
+            "no_cross_owner_data_exposure",
+            f"node '{ctx.node.id}' output mixes {len(owner_ids)} distinct owner_ids in one response",
+        )
+
+
 def no_plaintext_secrets_in_output(ctx: PolicyContext) -> None:
     """Security: scan a node's produced output for obvious hardcoded secrets before
     accepting it as passed."""
@@ -87,4 +105,5 @@ ENTRY_POLICIES: list[PolicyFn] = [
 
 EXIT_POLICIES: list[PolicyFn] = [
     no_plaintext_secrets_in_output,
+    no_cross_owner_data_exposure,
 ]

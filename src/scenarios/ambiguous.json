@@ -1,0 +1,76 @@
+{
+  "name": "ambiguous-analytics-dashboard",
+  "description": "Add a 'most popular links' endpoint from a one-line, underspecified ask. See docs/ambiguous-analysis.md.",
+  "nodes": [
+    {
+      "id": "clarify-requirements",
+      "stage": "requirements",
+      "description": "Confirm docs/ambiguous-analysis.md resolves the ambiguities (metric, window, limit, scope) before any design work.",
+      "depends_on": [],
+      "action": "clarify_requirements",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "spike-scope-decision",
+      "stage": "design",
+      "description": "Spike: prove the rejected global-leaderboard design is actually blocked by policy, not just discouraged in prose.",
+      "depends_on": ["clarify-requirements"],
+      "action": "spike_scope_decision",
+      "requires_approval": true,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "design-scoped-endpoint",
+      "stage": "design",
+      "description": "Design the owner-scoped endpoint contract (owner_id required, metric/window/limit params).",
+      "depends_on": ["spike-scope-decision"],
+      "action": "design_scoped_endpoint",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "implement-top-links",
+      "stage": "implementation",
+      "description": "Verify top_links() is correctly owner-scoped and ranks by the requested metric.",
+      "depends_on": ["design-scoped-endpoint"],
+      "action": "implement_top_links",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 1 },
+      "rollback_action": "revert_top_links"
+    },
+    {
+      "id": "run-tests",
+      "stage": "testing",
+      "description": "Run the top-links test suite.",
+      "depends_on": ["implement-top-links"],
+      "action": "run_tests",
+      "requires_approval": false,
+      "retry": { "max_attempts": 2, "backoff_seconds": 2 },
+      "rollback_action": null
+    },
+    {
+      "id": "write-docs",
+      "stage": "documentation",
+      "description": "Confirm docs/api.md documents GET /links/top.",
+      "depends_on": ["implement-top-links"],
+      "action": "write_docs",
+      "requires_approval": false,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": null
+    },
+    {
+      "id": "release-gate",
+      "stage": "release",
+      "description": "Release readiness for the ambiguous-scenario feature.",
+      "depends_on": ["run-tests", "write-docs"],
+      "action": "release_readiness_check",
+      "requires_approval": true,
+      "retry": { "max_attempts": 1, "backoff_seconds": 0 },
+      "rollback_action": "rollback_release"
+    }
+  ]
+}
