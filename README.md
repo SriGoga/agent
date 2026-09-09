@@ -33,8 +33,24 @@ pip install -e ".[dev]"
 pytest
 ```
 
-See `docs/setup.md` (added in a later phase) for full run instructions once the API and
-orchestrator CLI exist.
+See `docs/setup.md` for full run instructions (running the API server, running each
+orchestrator scenario via the CLI, troubleshooting).
+
+## Documentation index
+
+| Doc | Covers |
+|---|---|
+| [`docs/requirements.md`](docs/requirements.md) | Requirement understanding + identified ambiguities (Phase 1) |
+| [`docs/decomposition.md`](docs/decomposition.md) | Task decomposition: the greenfield dependency graph (Phase 2) |
+| [`docs/orchestrator.md`](docs/orchestrator.md) | Orchestration engine design (Phase 3) |
+| [`docs/architecture.md`](docs/architecture.md) | Component/control-flow overview, key decisions (Phase 8) |
+| [`docs/api.md`](docs/api.md) | Endpoint reference |
+| [`docs/brownfield-analysis.md`](docs/brownfield-analysis.md) | Codebase reasoning for the brownfield change (Phase 5) |
+| [`docs/ambiguous-analysis.md`](docs/ambiguous-analysis.md) | Ambiguity resolution for the ambiguous scenario (Phase 6) |
+| [`docs/risks.md`](docs/risks.md) | Risk register, including bugs found and fixed (Phase 7) |
+| [`docs/setup.md`](docs/setup.md) | Install, run, troubleshoot (Phase 8) |
+| [`docs/testing.md`](docs/testing.md) | Testing approach, coverage, limitations, trade-offs (Phase 8) |
+| [`docs/final-summary.md`](docs/final-summary.md) | Plan/rationale, artifacts, risks, assumptions, limitations (Phase 8) |
 
 ## Phase log
 
@@ -51,4 +67,5 @@ full diffs). This table is updated as part of every phase's own commit.
 | 5 - Brownfield: unique-visitor analytics | [#6](https://github.com/SriGoga/agent/pull/6) | `docs/brownfield-analysis.md` (codebase reasoning: impacted modules/APIs/data flows); adds `clicks.ip_hash` with an in-place migration for pre-existing databases, hashed (never raw) visitor IPs (`privacy.py`); `unique_visitors`/`unique_visitors_last_24h` on the analytics endpoint; `src/scenarios/brownfield.json` + `brownfield_steps.py`; 9 new tests including a hand-built pre-migration database; demonstrates the orchestrator's `replan()` for real against this codebase when the analytics spec was refined mid-flight |
 | 6 - Ambiguous: "show the most popular links" | [#7](https://github.com/SriGoga/agent/pull/7) | `docs/ambiguous-analysis.md` resolves 5 ambiguities (metric/window/limit/expired-link handling/scope); the one that matters is B5 -- rejecting a global cross-owner leaderboard as a privacy risk given no real auth. That rejection is enforced by a new orchestrator policy (`no_cross_owner_data_exposure`), not just written down. `GET /links/top`; `src/scenarios/ambiguous.json` + `ambiguous_steps.py` (its `spike-scope-decision` node proves the rejected design is actually blocked, not just discouraged); 8 new tests |
 | 7 - Validation & risk control | [#8](https://github.com/SriGoga/agent/pull/8) | `docs/risks.md`: consolidated risk register (service-level + orchestrator-level). Found and fixed 2 real gaps during the audit: a TOCTOU race between `code_exists()` and the insert (now `CodeAlreadyExistsError` -> clean 409/503 instead of an unhandled 500), and unbounded test-execution time in scenario steps (`run_pytest()` now takes a timeout, default 60s). 5 new tests |
+| 8 - Architecture, setup, testing, final summary | [#9](https://github.com/SriGoga/agent/pull/9) | `docs/architecture.md` (components, control flow, key-decision index), `docs/setup.md` (install/run/troubleshoot), `docs/testing.md` (approach, coverage, what's deliberately not tested), `docs/final-summary.md` (plan/rationale, artifact list, risks, assumptions, limitations) - the remaining assignment deliverables. Documentation only, no code changes; full suite re-verified at 54/54 |
 
